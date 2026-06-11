@@ -109,17 +109,21 @@ let hls;
 let allChannels = [];
 
 /* -----------------------
-   LOAD M3U PLAYLIST
+   LOAD IPTV-ORG PLAYLIST
 ------------------------*/
 fetch("https://iptv-org.github.io/iptv/index.m3u")
 .then(res => res.text())
 .then(parseM3U)
 .then(data => {
-    allChannels = data;
+
+    // safety limit so site doesn't lag
+    allChannels = data.slice(0, 800);
+
     render(allChannels);
 })
-.catch(() => {
-    // fallback if no playlist exists
+.catch(err => {
+    console.log("Failed to load playlist:", err);
+
     allChannels = [
         {
             name: "Sample Stream",
@@ -127,6 +131,7 @@ fetch("https://iptv-org.github.io/iptv/index.m3u")
             url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
         }
     ];
+
     render(allChannels);
 });
 
@@ -144,7 +149,6 @@ function parseM3U(data) {
 
         if (line.startsWith("#EXTINF")) {
             const parts = line.split(",");
-
             const groupMatch = line.match(/group-title="(.*?)"/);
 
             current = {
