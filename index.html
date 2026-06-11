@@ -1,152 +1,152 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TV Time</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TV Time</title>
 
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #111;
-            color: white;
-        }
+<style>
+body {
+    margin: 0;
+    font-family: Arial;
+    background: #111;
+    color: white;
+    display: flex;
+}
 
-        header {
-            padding: 15px;
-            text-align: center;
-            background: #222;
-        }
+/* sidebar */
+#sidebar {
+    width: 200px;
+    background: #1b1b1b;
+    height: 100vh;
+    padding: 10px;
+    box-sizing: border-box;
+}
 
-        #player {
-            width: 100%;
-            background: black;
-        }
+.category {
+    padding: 10px;
+    margin: 5px 0;
+    background: #2a2a2a;
+    border-radius: 5px;
+    cursor: pointer;
+}
 
-        video {
-            width: 100%;
-            max-height: 420px;
-        }
+.category:hover {
+    background: #444;
+}
 
-        #search {
-            width: 90%;
-            max-width: 400px;
-            margin: 15px auto;
-            display: block;
-            padding: 10px;
-            border: none;
-            border-radius: 5px;
-        }
+/* main area */
+#main {
+    flex: 1;
+    padding: 10px;
+}
 
-        .channels {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 10px;
-            padding: 15px;
-        }
+video {
+    width: 100%;
+    max-height: 400px;
+    background: black;
+}
 
-        .card {
-            background: #1e1e1e;
-            padding: 12px;
-            border-radius: 10px;
-            cursor: pointer;
-            text-align: center;
-        }
+#search {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border: none;
+    border-radius: 5px;
+}
 
-        .card:hover {
-            background: #333;
-        }
-    </style>
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+}
+
+.card {
+    background: #222;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.card:hover {
+    background: #333;
+}
+</style>
 </head>
 
 <body>
 
-<header>
-    <h1>TV Time</h1>
-</header>
-
-<div id="player">
-    <video id="videoPlayer" controls></video>
+<div id="sidebar">
+    <h3>Categories</h3>
+    <div class="category" onclick="filterCategory('all')">All</div>
+    <div class="category" onclick="filterCategory('General')">General</div>
 </div>
 
-<input id="search" placeholder="Search channels...">
+<div id="main">
+    <video id="player" controls></video>
 
-<div class="channels" id="channels"></div>
+    <input id="search" placeholder="Search channels...">
+
+    <div class="grid" id="grid"></div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
-const video = document.getElementById("videoPlayer");
+const player = document.getElementById("player");
+const grid = document.getElementById("grid");
 const search = document.getElementById("search");
-const container = document.getElementById("channels");
 
 let hls;
-let channels = [];
+let allChannels = [];
 
-// load channels
 fetch("channels.json")
-    .then(res => res.json())
-    .then(data => {
-        channels = data;
-        render(channels);
-    })
-    .catch(() => {
-        channels = [
-            {
-                name: "Sample Stream",
-                category: "General",
-                url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
-            }
-        ];
-        render(channels);
-    });
+.then(r => r.json())
+.then(data => {
+    allChannels = data;
+    render(allChannels);
+});
 
 function play(url) {
-    if (hls) {
-        hls.destroy();
-        hls = null;
-    }
+    if (hls) hls.destroy();
 
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = url;
-    } else if (window.Hls && Hls.isSupported()) {
+    if (player.canPlayType("application/vnd.apple.mpegurl")) {
+        player.src = url;
+    } else {
         hls = new Hls();
         hls.loadSource(url);
-        hls.attachMedia(video);
+        hls.attachMedia(player);
     }
 
-    video.play();
+    player.play();
 }
 
 function render(list) {
-    container.innerHTML = "";
+    grid.innerHTML = "";
 
     list.forEach(ch => {
         const div = document.createElement("div");
         div.className = "card";
 
-        div.innerHTML = `
-            <h3>${ch.name}</h3>
-            <p style="color:#aaa">${ch.category || ""}</p>
-        `;
-
+        div.innerHTML = `<b>${ch.name}</b><br><small>${ch.category}</small>`;
         div.onclick = () => play(ch.url);
 
-        container.appendChild(div);
+        grid.appendChild(div);
     });
 }
 
 search.addEventListener("input", e => {
     const q = e.target.value.toLowerCase();
-
-    render(
-        channels.filter(c =>
-            c.name.toLowerCase().includes(q) ||
-            (c.category || "").toLowerCase().includes(q)
-        )
-    );
+    render(allChannels.filter(c =>
+        c.name.toLowerCase().includes(q)
+    ));
 });
+
+function filterCategory(cat) {
+    if (cat === "all") return render(allChannels);
+
+    render(allChannels.filter(c => c.category === cat));
+}
 </script>
 
 </body>
