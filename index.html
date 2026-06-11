@@ -111,7 +111,7 @@ let allChannels = [];
 /* -----------------------
    LOAD M3U PLAYLIST
 ------------------------*/
-fetch("playlist.m3u")
+fetch("https://iptv-org.github.io/iptv/index.m3u")
 .then(res => res.text())
 .then(parseM3U)
 .then(data => {
