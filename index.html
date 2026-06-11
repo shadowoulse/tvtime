@@ -100,19 +100,73 @@ const search = document.getElementById("search");
 let hls;
 let allChannels = [];
 
-fetch("channels.json")
-.then(r => r.json())
-.then(data => {
-    allChannels = data;
-    render(allChannels);
-});
+/* ---------------------------
+   LOAD M3U PLAYLIST
+----------------------------*/
+fetch("playlist.m3u")
+  .then(res => res.text())
+  .then(parseM3U)
+  .then(data => {
+      allChannels = data;
+      render(allChannels);
+  })
+  .catch(err => {
+      console.log("No playlist found, using fallback");
 
+      allChannels = [
+          {
+              name: "Sample Stream",
+              category: "General",
+              url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
+          }
+      ];
+
+      render(allChannels);
+  });
+
+/* ---------------------------
+   PARSE M3U FILE
+----------------------------*/
+function parseM3U(data) {
+    const lines = data.split("\n");
+    const channels = [];
+
+    let current = {};
+
+    for (let line of lines) {
+        line = line.trim();
+
+        if (line.startsWith("#EXTINF")) {
+            // Extract channel name
+            const parts = line.split(",");
+            current = {
+                name: parts[1] || "Unknown",
+                category: "IPTV"
+            };
+        }
+
+        else if (line && !line.startsWith("#")) {
+            current.url = line;
+            channels.push(current);
+            current = {};
+        }
+    }
+
+    return channels;
+}
+
+/* ---------------------------
+   PLAY STREAM
+----------------------------*/
 function play(url) {
-    if (hls) hls.destroy();
+    if (hls) {
+        hls.destroy();
+        hls = null;
+    }
 
     if (player.canPlayType("application/vnd.apple.mpegurl")) {
         player.src = url;
-    } else {
+    } else if (window.Hls && Hls.isSupported()) {
         hls = new Hls();
         hls.loadSource(url);
         hls.attachMedia(player);
@@ -121,6 +175,9 @@ function play(url) {
     player.play();
 }
 
+/* ---------------------------
+   RENDER CHANNELS
+----------------------------*/
 function render(list) {
     grid.innerHTML = "";
 
@@ -128,26 +185,25 @@ function render(list) {
         const div = document.createElement("div");
         div.className = "card";
 
-        div.innerHTML = `<b>${ch.name}</b><br><small>${ch.category}</small>`;
+        div.innerHTML = `
+            <b>${ch.name}</b><br>
+            <small>${ch.category}</small>
+        `;
+
         div.onclick = () => play(ch.url);
 
         grid.appendChild(div);
     });
 }
 
+/* ---------------------------
+   SEARCH
+----------------------------*/
 search.addEventListener("input", e => {
     const q = e.target.value.toLowerCase();
+
     render(allChannels.filter(c =>
         c.name.toLowerCase().includes(q)
     ));
 });
-
-function filterCategory(cat) {
-    if (cat === "all") return render(allChannels);
-
-    render(allChannels.filter(c => c.category === cat));
-}
 </script>
-
-</body>
-</html>
