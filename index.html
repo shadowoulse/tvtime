@@ -1,26 +1,233 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live IPTV Streamer</title>
-    <!-- 1. External HLS library -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ultimate IPTV Player</title>
 
-    <style>
-        /* GLOBAL STYLES & RESET */
-        :root {
-            --main-bg-color: #1a202c; /* Dark background */
-            --card-bg-color: #2d3748; /* Slightly lighter card background */
-            --text-primary: #e2e8f0;
-            --accent-color: #4299e1; /* Blue highlight for active elements */
-            --success-color: #68d391;
-            --error-color: #f56565;
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+<style>
+:root {
+    --main-bg: #1e272e;
+    --card-bg: #2c394b;
+    --text-color: #ecf0f1;
+    --accent-color: #007bff;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: var(--main-bg);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+header {
+    padding: 15px;
+    background: #111821;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+#main-container {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+#player-section {
+    flex: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+}
+
+video {
+    width: 100%;
+    height: 100%;
+    background: black;
+}
+
+#sidebar {
+    flex: 1;
+    max-width: 320px;
+    background: #222c3a;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid #333;
+}
+
+#controls {
+    padding: 10px;
+    background: #2c394b;
+}
+
+input, button {
+    width: 100%;
+    margin: 5px 0;
+    padding: 8px;
+    border: none;
+    border-radius: 5px;
+}
+
+button {
+    background: var(--accent-color);
+    color: white;
+    cursor: pointer;
+}
+
+#channels {
+    overflow-y: auto;
+    flex: 1;
+}
+
+.channel {
+    padding: 10px;
+    border-bottom: 1px solid #333;
+    cursor: pointer;
+}
+
+.channel:hover {
+    background: #3a4b63;
+}
+</style>
+</head>
+
+<body>
+
+<header>Ultimate IPTV Player</header>
+
+<div id="main-container">
+
+    <!-- PLAYER -->
+    <div id="player-section">
+        <video id="video" controls></video>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+
+        <div id="controls">
+            <input id="m3uUrl" placeholder="Paste M3U URL here">
+            <button onclick="loadM3U()">Load Playlist</button>
+            <input type="file" id="fileInput" accept=".m3u,.txt" onchange="loadFile(event)">
+        </div>
+
+        <div id="channels"></div>
+
+    </div>
+
+</div>
+
+<script>
+const video = document.getElementById("video");
+let hls;
+
+let channels = [];
+
+/* -------------------------
+   LOAD FROM URL
+--------------------------*/
+async function loadM3U() {
+    const url = document.getElementById("m3uUrl").value;
+    if (!url) return alert("Enter M3U URL");
+
+    try {
+        const res = await fetch(url);
+        const text = await res.text();
+        parseM3U(text);
+    } catch (e) {
+        alert("Failed to load playlist");
+        console.error(e);
+    }
+}
+
+/* -------------------------
+   LOAD LOCAL FILE
+--------------------------*/
+function loadFile(event) {
+    const file = event.target.files[0];
+    const reader = new FileReader();
+
+    reader.onload = e => {
+        parseM3U(e.target.result);
+    };
+
+    reader.readAsText(file);
+}
+
+/* -------------------------
+   PARSE M3U
+--------------------------*/
+function parseM3U(data) {
+    channels = [];
+
+    const lines = data.split("\n");
+    let currentName = "";
+
+    for (let line of lines) {
+        line = line.trim();
+
+        if (line.startsWith("#EXTINF")) {
+            const parts = line.split(",");
+            currentName = parts[1] || "Unknown";
         }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--main-bg-color);
-            color: var(--text-primary);
-            margin: 0;
-            padding: 20px
+        else if (line && !line.startsWith("#")) {
+            channels.push({
+                name: currentName,
+                url: line
+            });
+        }
+    }
+
+    renderChannels();
+}
+
+/* -------------------------
+   SHOW CHANNEL LIST
+--------------------------*/
+function renderChannels() {
+    const container = document.getElementById("channels");
+    container.innerHTML = "";
+
+    channels.forEach(ch => {
+        const div = document.createElement("div");
+        div.className = "channel";
+        div.textContent = ch.name;
+        div.onclick = () => playChannel(ch.url);
+        container.appendChild(div);
+    });
+}
+
+/* -------------------------
+   PLAY STREAM
+--------------------------*/
+function playChannel(url) {
+    if (hls) {
+        hls.destroy();
+    }
+
+    if (url.includes(".m3u8")) {
+        if (Hls.isSupported()) {
+            hls = new Hls();
+            hls.loadSource(url);
+            hls.attachMedia(video);
+        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+            video.src = url;
+        }
+    } else {
+        video.src = url;
+    }
+
+    video.play();
+}
+</script>
+
+</body>
+</html>
