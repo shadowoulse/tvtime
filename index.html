@@ -171,22 +171,46 @@ function parseM3U(data) {
    PLAY STREAM
 ------------------------*/
 function play(url) {
+    if (!url) {
+        alert("No stream URL");
+        return;
+    }
+
+    console.log("Trying stream:", url);
+
     if (hls) {
         hls.destroy();
         hls = null;
     }
 
+    // Native HLS (Safari / some browsers)
     if (player.canPlayType("application/vnd.apple.mpegurl")) {
         player.src = url;
-    } else if (window.Hls && Hls.isSupported()) {
-        hls = new Hls();
-        hls.loadSource(url);
-        hls.attachMedia(player);
+        player.play().catch(err => {
+            console.log("Native play failed:", err);
+        });
     }
 
-    player.play();
-}
+    // HLS.js fallback
+    else if (window.Hls && Hls.isSupported()) {
+        hls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: true
+        });
 
+        hls.loadSource(url);
+        hls.attachMedia(player);
+
+        hls.on(Hls.Events.ERROR, function (event, data) {
+            console.log("HLS error:", data);
+            alert("Stream failed (dead or blocked)");
+        });
+    }
+
+    else {
+        alert("Your browser cannot play this stream type");
+    }
+}
 /* -----------------------
    RENDER CHANNELS
 ------------------------*/
