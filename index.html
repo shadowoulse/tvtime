@@ -1,27 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TV Time</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #111;
+            color: white;
+        }
+
+        header {
+            padding: 15px;
+            text-align: center;
+            background: #222;
+        }
+
+        #player {
+            width: 100%;
+            background: black;
+        }
+
+        video {
+            width: 100%;
+            max-height: 420px;
+        }
+
+        #search {
+            width: 90%;
+            max-width: 400px;
+            margin: 15px auto;
+            display: block;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+        }
+
+        .channels {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+            padding: 15px;
+        }
+
+        .card {
+            background: #1e1e1e;
+            padding: 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .card:hover {
+            background: #333;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>TV Time</h1>
+</header>
+
+<div id="player">
+    <video id="videoPlayer" controls></video>
+</div>
+
+<input id="search" placeholder="Search channels...">
+
+<div class="channels" id="channels"></div>
+
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
 <script>
 const video = document.getElementById("videoPlayer");
-const container = document.getElementById("channels");
 const search = document.getElementById("search");
+const container = document.getElementById("channels");
 
 let hls;
-let allChannels = [];
+let channels = [];
 
-// Load channels from channels.json
+// load channels
 fetch("channels.json")
-  .then(res => res.json())
-  .then(data => {
-      allChannels = data;
-      renderChannels(allChannels);
-  })
-  .catch(err => {
-      console.error("Failed to load channels.json", err);
-      container.innerHTML = "<p>Failed to load channels.</p>";
-  });
+    .then(res => res.json())
+    .then(data => {
+        channels = data;
+        render(channels);
+    })
+    .catch(() => {
+        channels = [
+            {
+                name: "Sample Stream",
+                category: "General",
+                url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
+            }
+        ];
+        render(channels);
+    });
 
-// Play stream
-function playStream(url) {
+function play(url) {
     if (hls) {
         hls.destroy();
         hls = null;
@@ -33,41 +114,40 @@ function playStream(url) {
         hls = new Hls();
         hls.loadSource(url);
         hls.attachMedia(video);
-    } else {
-        alert("Your browser does not support HLS streaming.");
     }
 
     video.play();
 }
 
-// Render channel cards
-function renderChannels(list) {
+function render(list) {
     container.innerHTML = "";
 
     list.forEach(ch => {
-        const card = document.createElement("div");
-        card.className = "card";
+        const div = document.createElement("div");
+        div.className = "card";
 
-        card.innerHTML = `
+        div.innerHTML = `
             <h3>${ch.name}</h3>
             <p style="color:#aaa">${ch.category || ""}</p>
         `;
 
-        card.onclick = () => playStream(ch.url);
+        div.onclick = () => play(ch.url);
 
-        container.appendChild(card);
+        container.appendChild(div);
     });
 }
 
-// Search filter
 search.addEventListener("input", e => {
     const q = e.target.value.toLowerCase();
 
-    const filtered = allChannels.filter(c =>
-        c.name.toLowerCase().includes(q) ||
-        (c.category && c.category.toLowerCase().includes(q))
+    render(
+        channels.filter(c =>
+            c.name.toLowerCase().includes(q) ||
+            (c.category || "").toLowerCase().includes(q)
+        )
     );
-
-    renderChannels(filtered);
 });
 </script>
+
+</body>
+</html>
