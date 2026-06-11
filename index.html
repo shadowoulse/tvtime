@@ -1,19 +1,3 @@
-const iptvSources = {
-    "GLOBAL (All Channels)": "https://iptv-org.github.io/iptv/index.m3u",
-
-    "NEWS": "https://iptv-org.github.io/iptv/categories/news.m3u",
-
-    "SPORTS": "https://iptv-org.github.io/iptv/categories/sports.m3u",
-
-    "MOVIES": "https://iptv-org.github.io/iptv/categories/movies.m3u",
-
-    "ENTERTAINMENT": "https://iptv-org.github.io/iptv/categories/entertainment.m3u",
-
-    "MUSIC": "https://iptv-org.github.io/iptv/categories/music.m3u",
-
-    "KIDS": "https://iptv-org.github.io/iptv/categories/kids.m3u"
-};
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -36,42 +20,39 @@ body {
     font-family: Arial, sans-serif;
     background: var(--main-bg);
     color: var(--text-color);
+    height: 100vh;
     display: flex;
     flex-direction: column;
-    height: 100vh;
 }
 
 header {
-    padding: 15px;
+    padding: 12px;
     background: #111821;
-    font-size: 18px;
     font-weight: bold;
 }
 
 #main-container {
-    display: flex;
     flex: 1;
+    display: flex;
     overflow: hidden;
 }
 
 #player-section {
     flex: 3;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 10px;
+    background: black;
 }
 
 video {
     width: 100%;
     height: 100%;
-    background: black;
 }
 
 #sidebar {
     flex: 1;
-    max-width: 320px;
+    max-width: 340px;
     background: #222c3a;
     display: flex;
     flex-direction: column;
@@ -83,9 +64,9 @@ video {
     background: #2c394b;
 }
 
-input, button {
+input, select, button {
     width: 100%;
-    margin: 5px 0;
+    margin: 4px 0;
     padding: 8px;
     border: none;
     border-radius: 5px;
@@ -103,13 +84,29 @@ button {
 }
 
 .channel {
-    padding: 10px;
+    padding: 8px;
     border-bottom: 1px solid #333;
     cursor: pointer;
+    display: flex;
+    justify-content: space-between;
 }
 
 .channel:hover {
     background: #3a4b63;
+}
+
+.active {
+    background: #1d6fff !important;
+}
+
+.star {
+    cursor: pointer;
+}
+.group {
+    padding: 6px;
+    background: #111821;
+    font-size: 12px;
+    opacity: 0.8;
 }
 </style>
 </head>
@@ -120,84 +117,112 @@ button {
 
 <div id="main-container">
 
-    <!-- PLAYER -->
-    <div id="player-section">
-        <video id="video" controls></video>
-    </div>
+<div id="player-section">
+    <video id="video" controls></video>
+</div>
 
-    <!-- SIDEBAR -->
-    <div id="sidebar">
+<div id="sidebar">
 
-        <div id="controls">
-            <input id="m3uUrl" placeholder="Paste M3U URL here">
-            <button onclick="loadM3U()">Load Playlist</button>
-            <input type="file" id="fileInput" accept=".m3u,.txt" onchange="loadFile(event)">
-        </div>
+<div id="controls">
 
-        <div id="channels"></div>
+    <select id="sourceSelect" onchange="loadSource()"></select>
 
-    </div>
+    <input id="search" placeholder="Search channels..." oninput="renderChannels()">
+
+    <input id="m3uUrl" placeholder="Paste custom M3U URL">
+    <button onclick="loadM3U()">Load Custom M3U</button>
+
+    <input type="file" onchange="loadFile(event)">
+
+</div>
+
+<div id="channels"></div>
+
+</div>
 
 </div>
 
 <script>
+
 const video = document.getElementById("video");
+
 let hls;
-
 let channels = [];
+let favorites = JSON.parse(localStorage.getItem("favorites") || "[]");
 
-/* -------------------------
-   LOAD FROM URL
---------------------------*/
+/* IPTV SOURCES */
+const iptvSources = {
+    "GLOBAL": "https://iptv-org.github.io/iptv/index.m3u",
+    "NEWS": "https://iptv-org.github.io/iptv/categories/news.m3u",
+    "SPORTS": "https://iptv-org.github.io/iptv/categories/sports.m3u",
+    "MOVIES": "https://iptv-org.github.io/iptv/categories/movies.m3u",
+    "ENTERTAINMENT": "https://iptv-org.github.io/iptv/categories/entertainment.m3u",
+    "MUSIC": "https://iptv-org.github.io/iptv/categories/music.m3u",
+    "KIDS": "https://iptv-org.github.io/iptv/categories/kids.m3u"
+};
+
+/* INIT */
+window.onload = () => {
+    const select = document.getElementById("sourceSelect");
+
+    for (let key in iptvSources) {
+        let opt = document.createElement("option");
+        opt.value = iptvSources[key];
+        opt.textContent = key;
+        select.appendChild(opt);
+    }
+
+    loadSource();
+};
+
+/* LOAD IPTV SOURCE */
+async function loadSource() {
+    const url = document.getElementById("sourceSelect").value;
+
+    const res = await fetch(url);
+    const text = await res.text();
+
+    parseM3U(text);
+}
+
+/* CUSTOM M3U */
 async function loadM3U() {
     const url = document.getElementById("m3uUrl").value;
-    if (!url) return alert("Enter M3U URL");
-
-    try {
-        const res = await fetch(url);
-        const text = await res.text();
-        parseM3U(text);
-    } catch (e) {
-        alert("Failed to load playlist");
-        console.error(e);
-    }
+    const res = await fetch(url);
+    const text = await res.text();
+    parseM3U(text);
 }
 
-/* -------------------------
-   LOAD LOCAL FILE
---------------------------*/
+/* FILE IMPORT */
 function loadFile(event) {
-    const file = event.target.files[0];
     const reader = new FileReader();
-
-    reader.onload = e => {
-        parseM3U(e.target.result);
-    };
-
-    reader.readAsText(file);
+    reader.onload = e => parseM3U(e.target.result);
+    reader.readAsText(event.target.files[0]);
 }
 
-/* -------------------------
-   PARSE M3U
---------------------------*/
+/* PARSE M3U */
 function parseM3U(data) {
     channels = [];
 
     const lines = data.split("\n");
-    let currentName = "";
+
+    let name = "";
+    let group = "Other";
 
     for (let line of lines) {
         line = line.trim();
 
         if (line.startsWith("#EXTINF")) {
-            const parts = line.split(",");
-            currentName = parts[1] || "Unknown";
+            name = line.split(",")[1] || "Unknown";
+            const match = line.match(/group-title="(.*?)"/);
+            group = match ? match[1] : "Other";
         }
 
         else if (line && !line.startsWith("#")) {
             channels.push({
-                name: currentName,
-                url: line
+                name,
+                url: line,
+                group
             });
         }
     }
@@ -205,44 +230,94 @@ function parseM3U(data) {
     renderChannels();
 }
 
-/* -------------------------
-   SHOW CHANNEL LIST
---------------------------*/
+/* SEARCH + GROUP + FAVORITES */
 function renderChannels() {
     const container = document.getElementById("channels");
     container.innerHTML = "";
 
-    channels.forEach(ch => {
+    const search = document.getElementById("search").value.toLowerCase();
+
+    let currentGroup = "";
+
+    channels
+    .filter(c => c.name.toLowerCase().includes(search))
+    .forEach(ch => {
+
+        if (ch.group !== currentGroup) {
+            currentGroup = ch.group;
+            const g = document.createElement("div");
+            g.className = "group";
+            g.textContent = currentGroup;
+            container.appendChild(g);
+        }
+
         const div = document.createElement("div");
         div.className = "channel";
-        div.textContent = ch.name;
-        div.onclick = () => playChannel(ch.url);
+
+        if (favorites.includes(ch.url)) div.classList.add("active");
+
+        div.innerHTML = `
+            <span>${ch.name}</span>
+            <span class="star" onclick="toggleFav(event, '${ch.url}')">★</span>
+        `;
+
+        div.onclick = () => playChannel(ch, div);
+
         container.appendChild(div);
     });
 }
 
-/* -------------------------
-   PLAY STREAM
---------------------------*/
-function playChannel(url) {
-    if (hls) {
-        hls.destroy();
+/* FAVORITES */
+function toggleFav(e, url) {
+    e.stopPropagation();
+
+    if (favorites.includes(url)) {
+        favorites = favorites.filter(f => f !== url);
+    } else {
+        favorites.push(url);
     }
 
-    if (url.includes(".m3u8")) {
+    localStorage.setItem("favorites", JSON.stringify(favorites));
+    renderChannels();
+}
+
+/* PLAY CHANNEL */
+function playChannel(ch, el) {
+
+    document.querySelectorAll(".channel").forEach(c => c.classList.remove("active"));
+    el.classList.add("active");
+
+    if (hls) hls.destroy();
+
+    if (ch.url.includes(".m3u8")) {
         if (Hls.isSupported()) {
             hls = new Hls();
-            hls.loadSource(url);
+            hls.loadSource(ch.url);
             hls.attachMedia(video);
-        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-            video.src = url;
+
+            hls.on(Hls.Events.ERROR, function () {
+                markDead(ch.url);
+            });
+
+        } else {
+            video.src = ch.url;
         }
     } else {
-        video.src = url;
+        video.src = ch.url;
     }
 
-    video.play();
+    video.play().catch(() => {});
 }
+
+/* AUTO REMOVE DEAD STREAMS */
+function markDead(url) {
+    channels = channels.filter(c => c.url !== url);
+    renderChannels();
+}
+
+/* AUTO REFRESH SEARCH */
+document.getElementById("search").addEventListener("input", renderChannels);
+
 </script>
 
 </body>
