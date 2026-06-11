@@ -1,182 +1,26 @@
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live IPTV Streamer</title>
+    <!-- 1. External HLS library -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
-<script>
-const player = document.getElementById("player");
-const grid = document.getElementById("grid");
-const search = document.getElementById("search-input");
-const categories = document.querySelectorAll(".category");
-
-let hls;
-let allChannels = [];
-
-/* -------------------------
-   LOAD M3U (FIXED + RELIABLE)
---------------------------*/
-fetch("https://iptv-org.github.io/iptv/index.m3u")
-.then(res => res.text())
-.then(parseM3U)
-.then(data => {
-
-    console.log("Loaded channels:", data.length);
-
-    // IMPORTANT: remove empty/broken entries
-    allChannels = data.filter(c =>
-        c.url &&
-        c.url.startsWith("http")
-    );
-
-    // prevent UI lag
-    allChannels = allChannels.slice(0, 300);
-
-    render(allChannels);
-})
-.catch(err => {
-    console.log("Fetch failed:", err);
-
-    allChannels = [
-        {
-            name: "Test Stream",
-            url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-            category: "general"
-        }
-    ];
-
-    render(allChannels);
-});
-
-/* -------------------------
-   FIXED M3U PARSER (IMPORTANT)
---------------------------*/
-function parseM3U(data) {
-    const lines = data.split("\n");
-    const channels = [];
-
-    let current = null;
-
-    for (let line of lines) {
-        line = line.trim();
-
-        // channel metadata line
-        if (line.startsWith("#EXTINF")) {
-
-            const nameMatch = line.split(",")[1];
-
-            const groupMatch = line.match(/group-title="(.*?)"/i);
-
-            current = {
-                name: nameMatch ? nameMatch.trim() : "Unknown Channel",
-                category: groupMatch ? groupMatch[1].toLowerCase() : "general",
-                url: null
-            };
+    <style>
+        /* GLOBAL STYLES & RESET */
+        :root {
+            --main-bg-color: #1a202c; /* Dark background */
+            --card-bg-color: #2d3748; /* Slightly lighter card background */
+            --text-primary: #e2e8f0;
+            --accent-color: #4299e1; /* Blue highlight for active elements */
+            --success-color: #68d391;
+            --error-color: #f56565;
         }
 
-        // actual stream URL line
-        else if (line && !line.startsWith("#")) {
-
-            if (current) {
-                current.url = line.trim();
-
-                // ONLY push valid http streams
-                if (current.url.startsWith("http")) {
-                    channels.push(current);
-                }
-
-                current = null;
-            }
-        }
-    }
-
-    return channels;
-}
-
-/* -------------------------
-   PLAY STREAM (FIXED)
---------------------------*/
-function play(url) {
-    if (!url) return;
-
-    console.log("Playing:", url);
-
-    if (hls) {
-        hls.destroy();
-        hls = null;
-    }
-
-    if (player.canPlayType("application/vnd.apple.mpegurl")) {
-        player.src = url;
-        player.play().catch(()=>{});
-    }
-
-    else if (window.Hls && Hls.isSupported()) {
-        hls = new Hls({
-            enableWorker: true,
-            lowLatencyMode: true
-        });
-
-        hls.loadSource(url);
-        hls.attachMedia(player);
-
-        hls.on(Hls.Events.ERROR, function (event, data) {
-            console.log("Stream error:", data);
-        });
-    }
-}
-
-/* -------------------------
-   RENDER CHANNELS (FIXED)
---------------------------*/
-function render(list) {
-    grid.innerHTML = "";
-
-    if (!list.length) {
-        grid.innerHTML = "<div class='channel-card'>No channels loaded</div>";
-        return;
-    }
-
-    list.forEach(ch => {
-        const div = document.createElement("div");
-        div.className = "channel-card";
-
-        div.innerHTML = `
-            <h3>${ch.name}</h3>
-            <p>${ch.category}</p>
-        `;
-
-        div.onclick = () => play(ch.url);
-
-        grid.appendChild(div);
-    });
-}
-
-/* -------------------------
-   SEARCH (FIXED)
---------------------------*/
-search.addEventListener("input", e => {
-    const q = e.target.value.toLowerCase();
-
-    render(allChannels.filter(c =>
-        c.name.toLowerCase().includes(q)
-    ));
-});
-
-/* -------------------------
-   CATEGORY FILTER (FIXED)
---------------------------*/
-categories.forEach(cat => {
-    cat.addEventListener("click", () => {
-
-        categories.forEach(c => c.classList.remove("active"));
-        cat.classList.add("active");
-
-        const type = cat.dataset.cat;
-
-        if (type === "all") {
-            render(allChannels);
-        } else {
-            render(allChannels.filter(c =>
-                c.category.includes(type)
-            ));
-        }
-    });
-});
-</script>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--main-bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px
