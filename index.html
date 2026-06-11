@@ -39,10 +39,10 @@ header {
 
 #player-section {
     flex: 3;
+    background: black;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: black;
 }
 
 video {
@@ -87,21 +87,12 @@ button {
     padding: 8px;
     border-bottom: 1px solid #333;
     cursor: pointer;
-    display: flex;
-    justify-content: space-between;
 }
 
 .channel:hover {
     background: #3a4b63;
 }
 
-.active {
-    background: #1d6fff !important;
-}
-
-.star {
-    cursor: pointer;
-}
 .group {
     padding: 6px;
     background: #111821;
@@ -142,17 +133,12 @@ button {
 
 </div>
 
+<!-- ===================== -->
+<!-- 1. SOURCES (MUST BE FIRST) -->
+<!-- ===================== -->
 <script>
-
-const video = document.getElementById("video");
-
-let hls;
-let channels = [];
-let favorites = JSON.parse(localStorage.getItem("favorites") || "[]");
-
-/* IPTV SOURCES */
 const iptvSources = {
-    "GLOBAL": "https://iptv-org.github.io/iptv/index.m3u",
+    "GLOBAL (All Channels)": "https://iptv-org.github.io/iptv/index.m3u",
     "NEWS": "https://iptv-org.github.io/iptv/categories/news.m3u",
     "SPORTS": "https://iptv-org.github.io/iptv/categories/sports.m3u",
     "MOVIES": "https://iptv-org.github.io/iptv/categories/movies.m3u",
@@ -160,6 +146,17 @@ const iptvSources = {
     "MUSIC": "https://iptv-org.github.io/iptv/categories/music.m3u",
     "KIDS": "https://iptv-org.github.io/iptv/categories/kids.m3u"
 };
+</script>
+
+<!-- ===================== -->
+<!-- 2. MAIN APP LOGIC -->
+<!-- ===================== -->
+<script>
+
+const video = document.getElementById("video");
+
+let channels = [];
+let hls = null;
 
 /* INIT */
 window.onload = () => {
@@ -175,22 +172,31 @@ window.onload = () => {
     loadSource();
 };
 
-/* LOAD IPTV SOURCE */
+/* LOAD SOURCE */
 async function loadSource() {
     const url = document.getElementById("sourceSelect").value;
 
-    const res = await fetch(url);
-    const text = await res.text();
-
-    parseM3U(text);
+    try {
+        const res = await fetch(url);
+        const text = await res.text();
+        parseM3U(text);
+    } catch (e) {
+        alert("Failed to load IPTV source (CORS or network issue)");
+        console.error(e);
+    }
 }
 
 /* CUSTOM M3U */
 async function loadM3U() {
     const url = document.getElementById("m3uUrl").value;
-    const res = await fetch(url);
-    const text = await res.text();
-    parseM3U(text);
+
+    try {
+        const res = await fetch(url);
+        const text = await res.text();
+        parseM3U(text);
+    } catch (e) {
+        alert("Failed to load custom playlist");
+    }
 }
 
 /* FILE IMPORT */
@@ -202,6 +208,7 @@ function loadFile(event) {
 
 /* PARSE M3U */
 function parseM3U(data) {
+
     channels = [];
 
     const lines = data.split("\n");
@@ -214,24 +221,22 @@ function parseM3U(data) {
 
         if (line.startsWith("#EXTINF")) {
             name = line.split(",")[1] || "Unknown";
+
             const match = line.match(/group-title="(.*?)"/);
             group = match ? match[1] : "Other";
         }
 
         else if (line && !line.startsWith("#")) {
-            channels.push({
-                name,
-                url: line,
-                group
-            });
+            channels.push({ name, url: line, group });
         }
     }
 
     renderChannels();
 }
 
-/* SEARCH + GROUP + FAVORITES */
+/* RENDER */
 function renderChannels() {
+
     const container = document.getElementById("channels");
     container.innerHTML = "";
 
@@ -240,83 +245,52 @@ function renderChannels() {
     let currentGroup = "";
 
     channels
-    .filter(c => c.name.toLowerCase().includes(search))
-    .forEach(ch => {
+        .filter(c => c.name.toLowerCase().includes(search))
+        .forEach(ch => {
 
-        if (ch.group !== currentGroup) {
-            currentGroup = ch.group;
-            const g = document.createElement("div");
-            g.className = "group";
-            g.textContent = currentGroup;
-            container.appendChild(g);
-        }
+            if (ch.group !== currentGroup) {
+                currentGroup = ch.group;
 
-        const div = document.createElement("div");
-        div.className = "channel";
+                const g = document.createElement("div");
+                g.className = "group";
+                g.textContent = currentGroup;
+                container.appendChild(g);
+            }
 
-        if (favorites.includes(ch.url)) div.classList.add("active");
+            const div = document.createElement("div");
+            div.className = "channel";
+            div.textContent = ch.name;
 
-        div.innerHTML = `
-            <span>${ch.name}</span>
-            <span class="star" onclick="toggleFav(event, '${ch.url}')">★</span>
-        `;
+            div.onclick = () => playChannel(ch);
 
-        div.onclick = () => playChannel(ch, div);
-
-        container.appendChild(div);
-    });
+            container.appendChild(div);
+        });
 }
 
-/* FAVORITES */
-function toggleFav(e, url) {
-    e.stopPropagation();
+/* PLAY */
+function playChannel(ch) {
 
-    if (favorites.includes(url)) {
-        favorites = favorites.filter(f => f !== url);
-    } else {
-        favorites.push(url);
+    if (hls) {
+        hls.destroy();
+        hls = null;
     }
 
-    localStorage.setItem("favorites", JSON.stringify(favorites));
-    renderChannels();
-}
-
-/* PLAY CHANNEL */
-function playChannel(ch, el) {
-
-    document.querySelectorAll(".channel").forEach(c => c.classList.remove("active"));
-    el.classList.add("active");
-
-    if (hls) hls.destroy();
-
     if (ch.url.includes(".m3u8")) {
+
         if (Hls.isSupported()) {
             hls = new Hls();
             hls.loadSource(ch.url);
             hls.attachMedia(video);
-
-            hls.on(Hls.Events.ERROR, function () {
-                markDead(ch.url);
-            });
-
         } else {
             video.src = ch.url;
         }
+
     } else {
         video.src = ch.url;
     }
 
     video.play().catch(() => {});
 }
-
-/* AUTO REMOVE DEAD STREAMS */
-function markDead(url) {
-    channels = channels.filter(c => c.url !== url);
-    renderChannels();
-}
-
-/* AUTO REFRESH SEARCH */
-document.getElementById("search").addEventListener("input", renderChannels);
 
 </script>
 
